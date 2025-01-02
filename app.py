@@ -559,4 +559,208 @@ with tab2:
         title='購入金額帯別の決済方法利用比率',
         labels={'value': '利用比率 (%)', 'index': '購入金額帯'}
     )
-    st.plotly_chart(fig_amount_payment, use_container_width=True) 
+    st.plotly_chart(fig_amount_payment, use_container_width=True)
+
+# 6. レポート出力
+st.header('6. レポート出力')
+tab1, tab2 = st.tabs(["データエクスポート", "PDFレポート"])
+
+with tab1:
+    st.subheader("データのエクスポート")
+    
+    # エクスポート対象の選択
+    export_options = {
+        '全データ': df_filtered,
+        '売上サマリー（日次）': df_filtered.groupby('購入日')['購入金額'].agg(['sum', 'count', 'mean']).reset_index(),
+        '売上サマリー（月次）': df_filtered.groupby(df_filtered['購入日'].dt.strftime('%Y-%m'))['購入金額'].agg(['sum', 'count', 'mean']).reset_index(),
+        'カテゴリー別集計': df_filtered.groupby('購入カテゴリー')['購入金額'].agg(['sum', 'count', 'mean']).reset_index(),
+        '地域別集計': df_filtered.groupby('地域')['購入金額'].agg(['sum', 'count', 'mean']).reset_index()
+    }
+    
+    export_selection = st.selectbox(
+        'エクスポートするデータを選択してください：',
+        list(export_options.keys())
+    )
+    
+    # CSVダウンロードボタン
+    if st.button('CSVファイルをダウンロード'):
+        csv = export_options[export_selection].to_csv(index=False)
+        st.download_button(
+            label="CSVファイルのダウンロードを開始",
+            data=csv,
+            file_name=f'{export_selection}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv',
+            mime='text/csv'
+        )
+
+with tab2:
+    st.subheader("PDFレポートの生成")
+    
+    # レポート設定
+    st.write("レポートに含める内容を選択してください：")
+    
+    report_options = {
+        '売上概要': st.checkbox('売上概要', value=True),
+        '時系列分析': st.checkbox('時系列分析', value=True),
+        '顧客分析': st.checkbox('顧客分析'),
+        '商品分析': st.checkbox('商品分析'),
+        '決済分析': st.checkbox('決済分析')
+    }
+    
+    # PDFレポートの生成ボタン
+    if st.button('PDFレポートを生成'):
+        # ここでは実際のPDF生成は行わず、機能の説明を表示
+        st.info('この機能は開発中です。完成時には以下の機能が利用可能になります：')
+        st.markdown("""
+        - 選択した分析内容を含むPDFレポートの生成
+        - グラフや表の自動レイアウト
+        - 分析結果の自動コメント生成
+        - ブランドテンプレートの適用
+        """)
+
+# 7. アラート設定
+st.header('7. アラート設定')
+
+# アラート条件の設定
+st.subheader("アラート条件の設定")
+
+col1, col2 = st.columns(2)
+
+with col1:
+    # 売上アラート
+    st.write("売上アラート")
+    sales_threshold = st.number_input(
+        "1日の売上がこの金額を下回った場合に通知",
+        min_value=0,
+        value=100000,
+        step=10000
+    )
+    
+    # 異常検知の感度
+    st.write("異常検知の感度")
+    sensitivity = st.slider(
+        "異常検知の感度を調整",
+        min_value=1,
+        max_value=5,
+        value=3,
+        help="1: 低感度（重要な異常のみ） ～ 5: 高感度（軽微な異常も検知）"
+    )
+
+with col2:
+    # カテゴリーアラート
+    st.write("カテゴリー別アラート")
+    category_threshold = st.number_input(
+        "カテゴリー別の売上が前月比でこの割合を下回った場合に通知",
+        min_value=0,
+        max_value=100,
+        value=20,
+        step=5,
+        help="例：20を入力すると、前月比-20%以上の下落で通知"
+    )
+
+# アラート通知設定
+st.subheader("通知設定")
+notification_methods = {
+    'メール通知': st.checkbox('メール通知を有効化'),
+    'LINE通知': st.checkbox('LINE通知を有効化'),
+    'Slack通知': st.checkbox('Slack通知を有効化')
+}
+
+if st.button('設定を保存'):
+    st.success('アラート設定を保存しました（デモ表示）')
+    
+# アラート履歴の表示（デモデータ）
+st.subheader("最近のアラート履歴")
+alert_history = pd.DataFrame({
+    '日時': ['2024-01-20 10:30', '2024-01-19 15:45', '2024-01-18 09:15'],
+    'タイプ': ['売上低下', 'カテゴリー売上異常', '異常値検知'],
+    '内容': [
+        '本日の売上が設定された閾値を下回りました',
+        '衣類カテゴリーの売上が前月比-25%',
+        '通常の2倍を超える注文数を検知'
+    ]
+})
+st.dataframe(alert_history, hide_index=True)
+
+# 8. 予測分析
+st.header('8. 予測分析')
+tab1, tab2 = st.tabs(["売上予測", "トレンド分析"])
+
+with tab1:
+    st.subheader("売上予測")
+    
+    # 予測期間の選択
+    forecast_period = st.slider(
+        "予測期間（日数）を選択",
+        min_value=7,
+        max_value=90,
+        value=30,
+        step=7
+    )
+    
+    # 予測モデルの選択
+    forecast_model = st.selectbox(
+        "予測モデルを選択",
+        ["シンプル移動平均", "指数平滑法", "SARIMA", "機械学習モデル"]
+    )
+    
+    if st.button('予測を実行'):
+        # ここでは簡単な移動平均による予測をデモ表示
+        last_date = df_filtered['購入日'].max()
+        future_dates = pd.date_range(start=last_date, periods=forecast_period + 1)[1:]
+        
+        # 過去30日の移動平均を計算
+        avg_daily_sales = df_filtered.groupby('購入日')['購入金額'].sum().rolling(window=30).mean().iloc[-1]
+        
+        # 予測データの作成（デモ用）
+        forecast_data = pd.DataFrame({
+            '日付': future_dates,
+            '予測売上': [avg_daily_sales * (1 + np.random.normal(0, 0.1)) for _ in range(len(future_dates))]
+        })
+        
+        # 予測結果の表示
+        fig_forecast = px.line(
+            forecast_data,
+            x='日付',
+            y='予測売上',
+            title=f'今後{forecast_period}日間の売上予測'
+        )
+        st.plotly_chart(fig_forecast, use_container_width=True)
+        
+        # 予測信頼区間の説明
+        st.info('青い線は予測値を、灰色の帯は予測の信頼区間を示しています（デモ表示）')
+
+with tab2:
+    st.subheader("トレンド分析")
+    
+    # トレンド分析の対象選択
+    trend_target = st.selectbox(
+        "分析対象を選択",
+        ["売上金額", "注文件数", "平均購入金額"]
+    )
+    
+    # トレンドの種類選択
+    trend_type = st.selectbox(
+        "トレンドの種類を選択",
+        ["長期トレンド", "季節性", "周期性"]
+    )
+    
+    if st.button('トレンド分析を実行'):
+        # デモ用のトレンド分析結果表示
+        st.write("トレンド分析結果（デモ表示）")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            # トレンド要素の分解（デモ）
+            st.write("トレンド要素の分解")
+            st.image("https://raw.githubusercontent.com/streamlit/demo-uber-nyc-pickups/main/data/decomposition.png", 
+                    caption="※これはデモ画像です")
+        
+        with col2:
+            # 主要な指標
+            st.write("主要な指標")
+            st.metric(label="トレンドの方向", value="上昇傾向", delta="+5.2%")
+            st.metric(label="季節性の強さ", value="中程度", delta="0.3")
+            st.metric(label="予測精度", value="85%", delta="+2.1%")
+
+# ... rest of the existing code ... 
