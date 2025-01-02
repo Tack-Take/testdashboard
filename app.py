@@ -42,6 +42,36 @@ date_range = st.sidebar.date_input(
 categories = ['すべて'] + list(df['購入カテゴリー'].unique())
 selected_category = st.sidebar.selectbox('カテゴリーを選択', categories)
 
+# 地域フィルター
+regions = ['すべて'] + list(df['地域'].unique())
+selected_region = st.sidebar.selectbox('地域を選択', regions)
+
+# 性別フィルター
+genders = ['すべて'] + list(df['性別'].unique())
+selected_gender = st.sidebar.selectbox('性別を選択', genders)
+
+# 年齢層フィルター
+age_bins = [0, 20, 30, 40, 50, 60, 70, 100]
+age_labels = ['20歳未満', '20-30歳', '31-40歳', '41-50歳', '51-60歳', '61-70歳', '71歳以上']
+df['年齢層'] = pd.cut(df['年齢'], bins=age_bins, labels=age_labels, right=False)
+age_ranges = ['すべて'] + list(df['年齢層'].unique())
+selected_age_range = st.sidebar.selectbox('年齢層を選択', age_ranges)
+
+# 支払方法フィルター
+payment_methods = ['すべて'] + list(df['支払方法'].unique())
+selected_payment = st.sidebar.selectbox('支払方法を選択', payment_methods)
+
+# 購入金額範囲フィルター
+min_amount = int(df['購入金額'].min())
+max_amount = int(df['購入金額'].max())
+amount_range = st.sidebar.slider(
+    '購入金額範囲',
+    min_value=min_amount,
+    max_value=max_amount,
+    value=(min_amount, max_amount),
+    step=1000
+)
+
 # データのフィルタリング
 if len(date_range) == 2:
     mask = (df['購入日'].dt.date >= date_range[0]) & (df['購入日'].dt.date <= date_range[1])
@@ -50,9 +80,90 @@ else:
     df_filtered = df.copy()
 
 if selected_category != 'すべて':
-    df_filtered = df_filtered[df_filtered['購入カテゴリー'] == selected_category].copy()
+    df_filtered = df_filtered[df_filtered['購入カテゴリー'] == selected_category]
+
+if selected_region != 'すべて':
+    df_filtered = df_filtered[df_filtered['地域'] == selected_region]
+
+if selected_gender != 'すべて':
+    df_filtered = df_filtered[df_filtered['性別'] == selected_gender]
+
+if selected_age_range != 'すべて':
+    df_filtered = df_filtered[df_filtered['年齢層'] == selected_age_range]
+
+if selected_payment != 'すべて':
+    df_filtered = df_filtered[df_filtered['支払方法'] == selected_payment]
+
+df_filtered = df_filtered[
+    (df_filtered['購入金額'] >= amount_range[0]) & 
+    (df_filtered['購入金額'] <= amount_range[1])
+]
+
+# フィルター適用後のレコード数を表示
+st.sidebar.markdown('---')
+st.sidebar.write(f'フィルター適用後のデータ件数: {len(df_filtered):,}件')
+st.sidebar.write(f'（全データ: {len(df):,}件）')
 
 # メインコンテンツ
+# 0. データ詳細
+st.header('0. データ詳細')
+tab1, tab2 = st.tabs(["データサマリー", "データテーブル"])
+
+with tab1:
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.subheader("データ期間")
+        st.write(f"開始日: {df_filtered['購入日'].min().strftime('%Y-%m-%d')}")
+        st.write(f"終了日: {df_filtered['購入日'].max().strftime('%Y-%m-%d')}")
+        st.write(f"期間: {(df_filtered['購入日'].max() - df_filtered['購入日'].min()).days + 1}日間")
+    
+    with col2:
+        st.subheader("データ規模")
+        st.write(f"総レコード数: {len(df_filtered):,}件")
+        st.write(f"ユニーク顧客数: {df_filtered['顧客ID'].nunique():,}人")
+        st.write(f"平均購入頻度: {len(df_filtered)/df_filtered['顧客ID'].nunique():.1f}回/人")
+
+    # カラム情報の表示
+    st.subheader("カラム情報")
+    column_info = pd.DataFrame({
+        'カラム名': df_filtered.columns,
+        'データ型': df_filtered.dtypes,
+        'ユニーク値数': [df_filtered[col].nunique() for col in df_filtered.columns],
+        '欠損値数': df_filtered.isnull().sum(),
+        '欠損率(%)': (df_filtered.isnull().sum() / len(df_filtered) * 100).round(2)
+    })
+    st.dataframe(column_info, hide_index=True)
+
+with tab2:
+    st.subheader("データテーブル")
+    
+    # ソート用のカラム選択
+    sort_column = st.selectbox(
+        'ソートするカラムを選択:',
+        ['購入日', '購入金額', '年齢', '顧客ID']
+    )
+    sort_order = st.radio(
+        'ソート順:',
+        ['降順', '昇順'],
+        horizontal=True
+    )
+    
+    # データの表示行数選択
+    n_rows = st.slider('表示する行数:', min_value=5, max_value=100, value=10)
+    
+    # データのソートと表示
+    if sort_order == '降順':
+        df_display = df_filtered.sort_values(sort_column, ascending=False).head(n_rows)
+    else:
+        df_display = df_filtered.sort_values(sort_column, ascending=True).head(n_rows)
+    
+    # 金額のフォーマット
+    df_display = df_display.copy()
+    df_display['購入金額'] = df_display['購入金額'].apply(lambda x: f'¥{x:,.0f}')
+    
+    st.dataframe(df_display, hide_index=True)
+
 # 1. 概要指標（Key Metrics）
 st.header('1. 概要指標')
 col1, col2, col3, col4 = st.columns(4)
